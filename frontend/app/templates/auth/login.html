@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Login - SpeechToText Pro{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-5 col-md-7">
+            <div class="auth-card glass-effect p-5 mt-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-sign-in-alt fa-3x text-primary mb-3"></i>
+                    <h3 class="text-white mb-2">Welcome Back</h3>
+                    <p class="text-light">Sign in to your account</p>
+                </div>
+
+                <!-- Email/Password Login Form -->
+                <form method="POST" class="mb-4">
+                    <div class="mb-3">
+                        <label for="email" class="form-label text-light">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" required 
+                               placeholder="Enter your email" value="{{ request.form.email or '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label text-light">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required 
+                               placeholder="Enter your password">
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
+                        <label class="form-check-label text-light" for="remember_me">
+                            Remember me
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 mb-3">
+                        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                    </button>
+                </form>
+
+                <!-- Divider -->
+                <div class="divider-container mb-4">
+                    <div class="divider-line"></div>
+                    <span class="divider-text text-light bg-transparent px-3">OR</span>
+                    <div class="divider-line"></div>
+                </div>
+
+                <!-- Social Login Options -->
+                <div class="social-login mb-4">
+                    <a href="{{ url_for('google_auth.login') }}" class="btn btn-outline-light w-100 mb-2">
+                        <i class="fab fa-google me-2"></i>Continue with Google
+                    </a>
+                    
+                </div>
+
+                <!-- Links -->
+                <div class="auth-links text-center">
+                    <div class="mb-2">
+                        <a href="{{ url_for('email_auth.forgot_password') }}" class="text-light">
+                            Forgot your password?
+                        </a>
+                    </div>
+                    <div>
+                        <span class="text-light">Don't have an account? </span>
+                        <a href="{{ url_for('email_auth.register') }}" class="text-primary">
+                            Sign up here
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.auth-card {
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.divider-container {
+    display: flex;
+    align-items: center;
+}
+
+.divider-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.divider-text {
+    font-size: 0.9rem;
+}
+
+.social-login .btn {
+    transition: all 0.3s ease;
+}
+
+.social-login .btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.auth-links a {
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.auth-links a:hover {
+    color: #007bff !important;
+}
+</style>
+{% endblock %}

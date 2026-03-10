@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}SpeechToText Pro - Advanced Audio Transcription{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section min-vh-100 d-flex align-items-center">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <div class="hero-content">
+                    <h1 class="display-4 fw-bold text-white mb-4">
+                        Transform Audio to Text with
+                        <span class="gradient-text">AI Precision</span>
+                    </h1>
+                    <p class="lead text-light mb-4">
+                        Upload your audio or video files and get accurate, editable transcriptions with timeline support. 
+                        Perfect for content creators, journalists, and professionals.
+                    </p>
+                    
+                    <div class="hero-features mb-4">
+                        <div class="feature-item d-flex align-items-center mb-2">
+                            <i class="fas fa-check-circle text-success me-3"></i>
+                            <span class="text-light">Support for audio and video files</span>
+                        </div>
+                        <div class="feature-item d-flex align-items-center mb-2">
+                            <i class="fas fa-check-circle text-success me-3"></i>
+                            <span class="text-light">Timeline-based transcript editing</span>
+                        </div>
+                        <div class="feature-item d-flex align-items-center mb-2">
+                            <i class="fas fa-check-circle text-success me-3"></i>
+                            <span class="text-light">Secure user authentication</span>
+                        </div>
+                        <div class="feature-item d-flex align-items-center">
+                            <i class="fas fa-check-circle text-success me-3"></i>
+                            <span class="text-light">Modern drag-and-drop interface</span>
+                        </div>
+                    </div>
+                    
+                    {% if not user.is_authenticated %}
+                        <div class="hero-actions">
+                            <a href="{{ url_for('email_auth.register') }}" class="btn btn-primary btn-lg glass-button me-3">
+                                <i class="fas fa-user-plus me-2"></i>Get Started
+                            </a>
+                            <a href="#features" class="btn btn-outline-light btn-lg">
+                                <i class="fas fa-info-circle me-2"></i>Learn More
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="hero-actions">
+                            <a href="{{ url_for('main.workspace') }}" class="btn btn-primary btn-lg glass-button">
+                                <i class="fas fa-desktop me-2"></i>Go to Workspace
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="hero-visual text-center">
+                    <div class="floating-card glass-effect p-4">
+                        <i class="fas fa-microphone display-1 text-primary mb-3"></i>
+                        <h5 class="text-white mb-3">Upload & Transcribe</h5>
+                        <div class="waveform-animation">
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center mb-5">
+                <h2 class="display-5 fw-bold text-white mb-4">Powerful Features</h2>
+                <p class="lead text-light">Everything you need for professional audio transcription</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card glass-effect p-4 h-100 text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="text-white mb-3">Easy Upload</h5>
+                    <p class="text-light">Drag and drop your audio or video files with beautiful animations and instant feedback.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card glass-effect p-4 h-100 text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-robot fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="text-white mb-3">AI Transcription</h5>
+                    <p class="text-light">Advanced AI technology provides accurate transcriptions with speaker identification.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card glass-effect p-4 h-100 text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-edit fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="text-white mb-3">Timeline Editor</h5>
+                    <p class="text-light">Edit transcripts with timeline precision. Click any segment to make changes instantly.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card glass-effect p-4 h-100 text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-video fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="text-white mb-3">Video Support</h5>
+                    <p class="text-light">Upload video files and we'll automatically extract audio for transcription.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card glass-effect p-4 h-100 text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-shield-alt fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="text-white mb-3">Secure & Private</h5>
+                    <p class="text-light">Your files and transcriptions are secure with user authentication and private workspaces.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card glass-effect p-4 h-100 text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-download fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="text-white mb-3">Export Options</h5>
+                    <p class="text-light">Export your transcriptions in various formats for use in your favorite applications.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center mb-5">
+                <h2 class="display-5 fw-bold text-white mb-4">How It Works</h2>
+                <p class="lead text-light">Simple steps to get your transcriptions</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="step-card text-center">
+                    <div class="step-number glass-effect">1</div>
+                    <h5 class="text-white mt-3 mb-3">Upload Your File</h5>
+                    <p class="text-light">Drag and drop your audio or video file into the workspace.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="step-card text-center">
+                    <div class="step-number glass-effect">2</div>
+                    <h5 class="text-white mt-3 mb-3">AI Processing</h5>
+                    <p class="text-light">Our AI analyzes your audio and creates an accurate transcription.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="step-card text-center">
+                    <div class="step-number glass-effect">3</div>
+                    <h5 class="text-white mt-3 mb-3">Edit & Export</h5>
+                    <p class="text-light">Review, edit, and export your transcription in your preferred format.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelector(this.getAttribute('href')).scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    });
+</script>
+{% endblock %}

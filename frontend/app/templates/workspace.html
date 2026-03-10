@@ -1,0 +1,650 @@
+{% extends "base.html" %}
+
+{% block title %}Workspace - SpeechToText Pro{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 20px;
+        letter-spacing: 0.03em;
+    }
+    .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .status-online  { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .status-online .status-dot  { background: #4ade80; box-shadow: 0 0 6px #4ade80; animation: statusPulse 2s infinite; }
+    .status-offline { background: rgba(239,68,68,0.15); color: #f87171; }
+    .status-offline .status-dot { background: #f87171; }
+    .status-unknown { background: rgba(148,163,184,0.15); color: #94a3b8; }
+    .status-unknown .status-dot { background: #94a3b8; }
+    .status-checking{ background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .status-checking .status-dot { background: #fbbf24; animation: statusPulse 1s infinite; }
+    @keyframes statusPulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
+    }
+
+    /* ── Tab switcher ─────────────────────────────────────── */
+    .mode-tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+    .mode-tab {
+        flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--glass-border);
+        background: transparent; color: rgba(255,255,255,0.5); font-size: 0.9rem;
+        font-weight: 600; cursor: pointer; transition: all 0.25s ease;
+    }
+    .mode-tab.active {
+        background: rgba(56,189,248,0.15); color: #38BDF8;
+        border-color: rgba(56,189,248,0.4);
+    }
+    .mode-tab:hover:not(.active) { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.2); }
+
+    /* ── Record panel ─────────────────────────────────────── */
+    .record-area { border-radius: 16px; }
+
+    .record-btn {
+        width: 80px; height: 80px; border-radius: 50%; border: none; cursor: pointer;
+        background: var(--gradient-primary); color: white; font-size: 1.8rem;
+        transition: all 0.3s ease; box-shadow: 0 0 0 0 rgba(56,189,248,0.4);
+        display: flex; align-items: center; justify-content: center; margin: 0 auto;
+    }
+    .record-btn.recording {
+        background: linear-gradient(135deg, #f87171, #ef4444);
+        animation: recordPulse 1.5s ease-in-out infinite;
+        box-shadow: 0 0 0 8px rgba(248,113,113,0.2);
+    }
+    @keyframes recordPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.4); }
+        50%       { box-shadow: 0 0 0 16px rgba(248,113,113,0); }
+    }
+    .record-btn:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
+
+    .record-timer {
+        font-size: 2.5rem; font-weight: 700; letter-spacing: 0.05em;
+        color: white; font-variant-numeric: tabular-nums; margin: 1rem 0;
+    }
+    .record-timer.recording { color: #f87171; }
+
+    #waveformCanvas {
+        width: 100%; height: 64px; border-radius: 8px;
+        background: rgba(0,0,0,0.2);
+    }
+
+    .record-preview-section { margin-top: 1.5rem; }
+    .record-preview-section audio {
+        width: 100%; border-radius: 8px; margin-bottom: 1rem;
+        filter: invert(1) hue-rotate(180deg);
+    }
+    .record-hint { font-size: 0.82rem; opacity: 0.5; margin-top: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-5 mt-5">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-lg-3">
+            <div class="sidebar glass-effect p-4">
+                <h5 class="text-white mb-4">
+                    <i class="fas fa-history me-2"></i>Recent Transcriptions
+                </h5>
+                
+                {% if jobs %}
+                    <div class="job-list">
+                        {% for job in jobs %}
+                            <div class="job-item mb-3 p-3 rounded {{ 'active' if current_job and current_job.id == job.id else '' }}"
+                                 onclick="window.location.href='{{ url_for('main.view_job', job_id=job.id) }}'">
+                                <h6 class="text-white mb-1" style="word-break:break-word;">{{ job.filename }}</h6>
+                                <small class="text-light d-block mb-2">{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-light">
+                                        <i class="fas fa-{{ 'video' if job.file_type == 'video' else 'music' }} me-1"></i>
+                                        {{ job.file_type.title() }} File
+                                    </small>
+                                    <span class="badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'processing' else 'danger' }} ms-2" style="white-space:nowrap;">
+                                        {{ job.status }}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-light">
+                        <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
+                        <p>No transcriptions yet</p>
+                    </div>
+                {% endif %}
+
+                <!-- Service Status Panel -->
+                <div class="mt-4 pt-3" style="border-top: 1px solid rgba(56,189,248,0.15);">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-white mb-0" style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">
+                            <i class="fas fa-server me-1"></i>Services
+                        </h6>
+                        <button onclick="refreshServiceHealth()" class="btn btn-link p-0 text-light" style="font-size:0.75rem;" title="Refresh">
+                            <i class="fas fa-sync-alt" id="healthRefreshIcon"></i>
+                        </button>
+                    </div>
+                    <div id="serviceStatusList">
+                        <div class="service-status-row d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-light" style="font-size:0.82rem;"><i class="fas fa-globe me-2 opacity-50"></i>Frontend</span>
+                            <span class="status-badge status-online"><span class="status-dot"></span>Online</span>
+                        </div>
+                        <div class="service-status-row d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-light" style="font-size:0.82rem;"><i class="fas fa-microchip me-2 opacity-50"></i>Backend API</span>
+                            <span class="status-badge status-checking" id="backendStatus"><span class="status-dot"></span>Checking...</span>
+                        </div>
+                        <div class="service-status-row d-flex justify-content-between align-items-center">
+                            <span class="text-light" style="font-size:0.82rem;"><i class="fas fa-tasks me-2 opacity-50"></i>Celery Worker</span>
+                            <span class="status-badge status-checking" id="celeryStatus"><span class="status-dot"></span>Checking...</span>
+                        </div>
+                    </div>
+                    <p class="text-light mb-0 mt-2" style="font-size:0.7rem; opacity:0.5;" id="healthLastChecked"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-lg-9" style="margin-top: -2rem;">
+            {% if current_job %}
+                <!-- Transcription View -->
+                <div class="transcription-view">
+                    {% if current_job.status == 'completed' and segments %}
+                        <!-- Media Player -->
+                        <div id="mediaPlayerContainer" class="mb-4">
+                            <!-- Media player will be inserted here by JavaScript -->
+                        </div>
+                        
+                        <div class="transcript-timeline glass-effect p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h5 class="text-white mb-0">
+                                    <i class="fas fa-list me-2"></i>Interactive Transcript
+                                </h5>
+                                <div class="transcript-actions">
+                                    <button class="btn btn-outline-light btn-sm me-2" onclick="exportTranscript()">
+                                        <i class="fas fa-download me-1"></i>Export
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" onclick="toggleEditMode()">
+                                        <i class="fas fa-edit me-1"></i>Edit Mode
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-container">
+                                {% for segment in segments %}
+                                    <div class="timeline-segment" data-segment-id="{{ segment.id }}" onclick="mediaPlayer && mediaPlayer.seekToSegment({id: {{ segment.id }}, start_time: {{ segment.start_time }}, end_time: {{ segment.end_time }}})">
+                                        <div class="segment-time">
+                                            <span class="time-badge">
+                                                {{ "%.1f"|format(segment.start_time) }}s - {{ "%.1f"|format(segment.end_time) }}s
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="segment-text">
+                                            <div class="text-display">
+                                                {{ segment.edited_text or segment.original_text }}
+                                            </div>
+                                            <div class="text-editor" style="display: none;">
+                                                <textarea class="form-control" rows="2">{{ segment.edited_text or segment.original_text }}</textarea>
+                                                <div class="editor-actions mt-2">
+                                                    <button class="btn btn-sm btn-success save-edit" onclick="saveSegmentEdit({{ segment.id }})">
+                                                        <i class="fas fa-check me-1"></i>Save
+                                                    </button>
+                                                    <button class="btn btn-sm btn-secondary cancel-edit" onclick="cancelSegmentEdit({{ segment.id }})">
+                                                        <i class="fas fa-times me-1"></i>Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="segment-actions">
+                                            <button class="btn btn-sm btn-outline-primary edit-segment" onclick="editSegment({{ segment.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% elif current_job.status == 'processing' %}
+                        <div class="processing-status glass-effect p-5 text-center">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <h5 class="text-white">Processing your file...</h5>
+                            <p class="text-light">This may take a few minutes depending on the file size.</p>
+                        </div>
+                    {% elif current_job.status == 'error' %}
+                        <div class="error-status glass-effect p-5 text-center">
+                            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                            <h5 class="text-white">Processing Error</h5>
+                            <p class="text-light">There was an error processing your file. Please try uploading again.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <!-- Upload / Record section -->
+                <div class="upload-section" style="margin-top: 2rem;">
+
+                    <!-- Tab switcher -->
+                    <div class="mode-tabs">
+                        <button class="mode-tab active" id="tabUpload" onclick="switchMode('upload')">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>Upload File
+                        </button>
+                        <button class="mode-tab" id="tabRecord" onclick="switchMode('record')">
+                            <i class="fas fa-microphone me-2"></i>Record Live
+                        </button>
+                    </div>
+
+                    <!-- ── Upload panel (unchanged) ─────────────────── -->
+                    <div id="panelUpload">
+                        <div class="upload-area glass-effect p-5 text-center" id="uploadArea">
+                            <div class="upload-icon mb-4">
+                                <i class="fas fa-cloud-upload-alt fa-5x text-primary file-type-icon"></i>
+                            </div>
+                            <h4 class="text-white mb-3">Upload Audio or Video File</h4>
+                            <p class="text-light mb-4">
+                                Drag and drop your files here or click to browse<br>
+                                <small>Supports: MP3, WAV, MP4, AVI, MOV and more</small>
+                            </p>
+                            <input type="file" id="fileInput" class="d-none" accept="audio/*,video/*">
+                            <button class="btn btn-primary btn-lg glass-button" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-folder-open me-2"></i>Choose File
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ── Record panel ─────────────────────────────── -->
+                    <div id="panelRecord" style="display:none;">
+                        <div class="record-area glass-effect p-5 text-center">
+
+                            <!-- Timer -->
+                            <div class="record-timer" id="recordTimer">00:00</div>
+
+                            <!-- Waveform canvas -->
+                            <canvas id="waveformCanvas" height="64"></canvas>
+
+                            <!-- Main record button -->
+                            <div class="my-4">
+                                <button class="record-btn" id="recordBtn" onclick="toggleRecording()" title="Start recording">
+                                    <i class="fas fa-microphone" id="recordBtnIcon"></i>
+                                </button>
+                                <p class="text-light mt-3 mb-0" id="recordHint">Click to start recording</p>
+                            </div>
+
+                            <!-- Preview + transcribe (shown after stop) -->
+                            <div class="record-preview-section" id="recordPreview" style="display:none;">
+                                <audio id="audioPreview" controls></audio>
+                                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                                    <button class="btn btn-outline-light" onclick="resetRecording()">
+                                        <i class="fas fa-redo me-2"></i>Re-record
+                                    </button>
+                                    <button class="btn btn-primary glass-button" onclick="transcribeRecording()">
+                                        <i class="fas fa-magic me-2"></i>Transcribe Recording
+                                    </button>
+                                </div>
+                                <p class="record-hint text-light">Review your recording before transcribing</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Shared progress panel (used by both modes) -->
+                    <div class="upload-progress mt-4" id="uploadProgress" style="display: none;">
+                        <div class="glass-effect p-4">
+                            <h5 class="text-white mb-3">Processing...</h5>
+                            <ul class="upload-steps">
+                                <li class="upload-step" id="step-upload">
+                                    <i class="fas fa-upload"></i><span>Uploading file...</span>
+                                </li>
+                                <li class="upload-step" id="step-extract">
+                                    <i class="fas fa-scissors"></i><span>Extracting audio...</span>
+                                </li>
+                                <li class="upload-step" id="step-transcribe">
+                                    <i class="fas fa-microphone"></i><span>Starting transcription...</span>
+                                </li>
+                            </ul>
+                            <div class="progress mb-3 processing-progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width: 0%" id="overallProgress"></div>
+                            </div>
+                            <p class="text-light mb-0" id="uploadStatus">Preparing upload...</p>
+                        </div>
+                    </div>
+
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- FFmpeg.wasm for client-side audio extraction -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script src="{{ url_for('static', filename='js/media-processor.js') }}"></script>
+<script src="{{ url_for('static', filename='js/media-player.js') }}"></script>
+<script src="{{ url_for('static', filename='js/transcript-editor.js') }}"></script>
+<script src="{{ url_for('static', filename='js/recorder.js') }}"></script>
+<script src="{{ url_for('static', filename='js/waveform-visualizer.js') }}"></script>
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    let currentJobId = null;
+
+    {% if current_job and current_job.status == 'completed' and segments %}
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('Template script: DOM loaded, initializing...');
+        
+        const jobData = {
+            id: {{ current_job.id }},
+            filename: "{{ current_job.filename }}",
+            file_type: "{{ current_job.file_type }}",
+            original_file_url: "{{ current_job.original_file_url }}",
+            audio_file_url: "{{ current_job.audio_file_url }}",
+            duration: {{ current_job.duration or 0 }},
+            segments: [
+                {% for segment in segments %}
+                {
+                    id: {{ segment.id }},
+                    start_time: {{ segment.start_time }},
+                    end_time: {{ segment.end_time }},
+                    original_text: "{{ segment.original_text|replace('"', '\\"') }}",
+                    edited_text: "{{ segment.edited_text|replace('"', '\\"') if segment.edited_text else '' }}"
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ]
+        };
+
+        const container = document.getElementById('mediaPlayerContainer');
+        if (container) {
+            window.mediaPlayer = new MediaPlayer(container, jobData);
+            console.log('MediaPlayer initialized');
+        }
+
+        // Initialize TranscriptEditor AFTER the DOM elements are ready
+        setTimeout(() => {
+            if (document.querySelector('.transcription-view')) {
+                console.log('Creating TranscriptEditor instance from template');
+                window.transcriptEditor = new TranscriptEditor();
+            }
+        }, 100);
+
+        // Remove the direct function assignments since they're handled in the class now
+        console.log('Template initialization complete');
+    });
+    {% endif %}
+
+    uploadArea?.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) updateUploadIcon(files[0]);
+    });
+
+    uploadArea?.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        resetUploadIcon();
+    });
+
+    uploadArea?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFileUpload(files[0]);
+    });
+
+    fileInput?.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+    });
+
+    function updateUploadIcon(file) {
+        const icon = document.querySelector('.file-type-icon');
+        if (file.type.startsWith('video/')) {
+            icon.className = 'fas fa-video fa-5x file-type-icon file-type-video';
+        } else if (file.type.startsWith('audio/')) {
+            icon.className = 'fas fa-music fa-5x file-type-icon file-type-audio';
+        }
+    }
+
+    function resetUploadIcon() {
+        const icon = document.querySelector('.file-type-icon');
+        icon.className = 'fas fa-cloud-upload-alt fa-5x text-primary file-type-icon';
+    }
+
+    function updateStep(stepId, status) {
+        const step = document.getElementById(stepId);
+        if (!step) return;
+        step.classList.remove('active', 'completed');
+        step.classList.add(status);
+        const icon = step.querySelector('i');
+        icon.className = (status === 'active') ? 'fas fa-spinner fa-spin' : 'fas fa-check';
+    }
+
+    function updateProgress(percent) {
+        const progressBar = document.getElementById('overallProgress');
+        if (progressBar) progressBar.style.width = percent + '%';
+    }
+
+    async function handleFileUpload(file) {
+        try {
+            if (!validateFileType(file)) {
+                showToast('Please select a valid audio or video file.', 'error');
+                return;
+            }
+
+            updateUploadIcon(file);
+            document.getElementById('uploadProgress').style.display = 'block';
+            uploadArea.classList.add('processing');
+
+            updateStep('step-upload', 'active');
+            updateProgress(10);
+
+            const uploadResult = await uploadFile(file);
+            if (!uploadResult.success) throw new Error(uploadResult.error);
+
+            updateStep('step-upload', 'completed');
+            updateProgress(30);
+            currentJobId = uploadResult.job_id;
+
+            updateStep('step-extract', 'active');
+            document.getElementById('uploadStatus').textContent = 'Extracting audio from file...';
+            await mediaProcessor.extractAudio(file);
+            updateStep('step-extract', 'completed');
+            updateProgress(70);
+
+            updateStep('step-transcribe', 'active');
+            document.getElementById('uploadStatus').textContent = 'Starting transcription...';
+
+            updateStep('step-transcribe', 'completed');
+            updateProgress(100);
+            document.getElementById('uploadStatus').textContent = 'Transcription started! Processing in background...';
+            showToast('File uploaded successfully! Transcription in progress.', 'success');
+
+            setTimeout(() => pollJobStatus(currentJobId), 3000);
+        } catch (error) {
+            console.error('Upload error:', error);
+            showToast('Upload failed: ' + error.message, 'error');
+            document.getElementById('uploadProgress').style.display = 'none';
+            uploadArea.classList.remove('processing');
+            resetUploadIcon();
+        }
+    }
+
+    async function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('{{ url_for("main.upload_file") }}', {
+            method: 'POST',
+            body: formData
+        });
+        return await response.json();
+    }
+
+    function pollJobStatus(jobId) {
+        const interval = setInterval(() => {
+            fetch(`{{ url_for('main.job_status', job_id=0) }}`.replace('0', jobId))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        window.location.href = `{{ url_for('main.view_job', job_id=0) }}`.replace('0', jobId);
+                    } else if (data.status === 'error') {
+                        clearInterval(interval);
+                        document.getElementById('uploadStatus').textContent = 'Transcription failed. Please try again.';
+                        document.getElementById('uploadStatus').className = 'text-danger';
+                    }
+                })
+                .catch(err => console.error('Error polling job status:', err));
+        }, 3000);
+    }
+
+    {% if current_job and current_job.status == 'processing' %}
+    setTimeout(() => window.location.reload(), 10000); // Refresh every 10s
+    {% endif %}
+
+    // ── Tab switcher ──────────────────────────────────────────────────────
+    function switchMode(mode) {
+        document.getElementById('panelUpload').style.display = mode === 'upload' ? '' : 'none';
+        document.getElementById('panelRecord').style.display = mode === 'record' ? '' : 'none';
+        document.getElementById('tabUpload').classList.toggle('active', mode === 'upload');
+        document.getElementById('tabRecord').classList.toggle('active', mode === 'record');
+        if (mode !== 'record') resetRecording();
+    }
+
+    // ── Recorder wiring ───────────────────────────────────────────────────
+    const recorder = new AudioRecorder();
+    let visualizer = null;
+    let timerInterval = null;
+    let elapsedSeconds = 0;
+
+    function updateTimer() {
+        elapsedSeconds++;
+        const m = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+        const s = String(elapsedSeconds % 60).padStart(2, '0');
+        const el = document.getElementById('recordTimer');
+        if (el) el.textContent = `${m}:${s}`;
+    }
+
+    async function toggleRecording() {
+        if (recorder.isRecording) {
+            await stopRecording();
+        } else {
+            await startRecording();
+        }
+    }
+
+    async function startRecording() {
+        try {
+            const stream = await recorder.start();
+
+            // Start waveform
+            const canvas = document.getElementById('waveformCanvas');
+            if (canvas) {
+                visualizer = new WaveformVisualizer(canvas);
+                visualizer.start(stream);
+            }
+
+            // Start timer
+            elapsedSeconds = 0;
+            timerInterval = setInterval(updateTimer, 1000);
+
+            // Update UI
+            document.getElementById('recordBtn').classList.add('recording');
+            document.getElementById('recordBtnIcon').className = 'fas fa-stop';
+            document.getElementById('recordTimer').classList.add('recording');
+            document.getElementById('recordHint').textContent = 'Recording… click to stop';
+            document.getElementById('recordPreview').style.display = 'none';
+        } catch (err) {
+            showToast('Microphone access denied. Please allow microphone access.', 'danger');
+        }
+    }
+
+    async function stopRecording() {
+        const blob = await recorder.stop();
+
+        // Stop visualizer + timer
+        visualizer?.stop();
+        visualizer = null;
+        clearInterval(timerInterval);
+
+        // Show preview
+        const preview = document.getElementById('audioPreview');
+        preview.src = URL.createObjectURL(blob);
+        document.getElementById('recordPreview').style.display = '';
+
+        // Reset button
+        document.getElementById('recordBtn').classList.remove('recording');
+        document.getElementById('recordBtnIcon').className = 'fas fa-microphone';
+        document.getElementById('recordTimer').classList.remove('recording');
+        document.getElementById('recordHint').textContent = 'Recording stopped';
+    }
+
+    function resetRecording() {
+        if (recorder.isRecording) {
+            recorder.stop().then(() => {
+                visualizer?.stop(); visualizer = null;
+                clearInterval(timerInterval);
+            });
+        }
+        document.getElementById('recordPreview').style.display = 'none';
+        document.getElementById('recordTimer').textContent = '00:00';
+        document.getElementById('recordTimer').classList.remove('recording');
+        document.getElementById('recordBtn').classList.remove('recording');
+        document.getElementById('recordBtnIcon').className = 'fas fa-microphone';
+        document.getElementById('recordHint').textContent = 'Click to start recording';
+        elapsedSeconds = 0;
+    }
+
+    function transcribeRecording() {
+        const file = recorder.getFile();
+        if (!file) { showToast('No recording found. Please record first.', 'danger'); return; }
+        // Reuse the exact same upload pipeline — OCP satisfied
+        handleFileUpload(file);
+    }
+
+    // ── Service Health Check ──────────────────────────────────────────────
+    function setStatus(elementId, status) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const labels = { online: 'Online', offline: 'Offline', unknown: 'Unknown' };
+        el.className = `status-badge status-${status}`;
+        el.innerHTML = `<span class="status-dot"></span>${labels[status] || status}`;
+    }
+
+    function refreshServiceHealth() {
+        const icon = document.getElementById('healthRefreshIcon');
+        if (icon) icon.classList.add('fa-spin');
+        setStatus('backendStatus', 'checking');
+        setStatus('celeryStatus', 'checking');
+
+        fetch('{{ url_for("main.services_health") }}')
+            .then(r => r.json())
+            .then(data => {
+                setStatus('backendStatus', data.backend);
+                setStatus('celeryStatus', data.celery === 'unknown' ? 'unknown' : data.celery);
+                const ts = new Date().toLocaleTimeString();
+                const el = document.getElementById('healthLastChecked');
+                if (el) el.textContent = `Last checked: ${ts}`;
+            })
+            .catch(() => {
+                setStatus('backendStatus', 'offline');
+                setStatus('celeryStatus', 'unknown');
+            })
+            .finally(() => {
+                if (icon) icon.classList.remove('fa-spin');
+            });
+    }
+
+    // Initial check + auto-refresh every 30 seconds
+    refreshServiceHealth();
+    setInterval(refreshServiceHealth, 30000);
+</script>
+{% endblock %}

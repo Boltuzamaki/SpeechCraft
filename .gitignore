@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+.envrc
+secrets.json
+
+# Databases
+*.sqlite3
+*.db
+
+# Logs & temp files
+*.log
+*.tmp
+*.bak
+*.orig
+
+# Uploads / user-generated content
+frontend/app/static/uploads/
+
+# Audio / video files
+*.mp3
+*.mp4
+*.wav
+*.ogg
+*.flac
+*.aac
+*.m4a
+*.webm
+*.mkv
+*.avi
+*.mov
+
+# IDE & editor configs
+.vscode/
+.idea/
+*.iml
+*.code-workspace
+*.sublime-workspace
+*.sublime-project
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker overrides
+docker-compose.override.yml
+
+# uv / pip
+*.egg-info/
+dist/
+build/

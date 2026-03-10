@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  # FastAPI Service
+  fastapi:
+    build: .
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"  
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  # Celery Worker Service
+  celery:
+    build: .
+    command: uv run celery -A app.api.worker.celery worker --loglevel=info --concurrency=1
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - bark_model_cache:/root/.cache/suno/bark_v0
+
+  # Redis Service
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"  
+
+volumes:
+  bark_model_cache:

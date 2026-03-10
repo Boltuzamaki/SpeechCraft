@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.swp
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# FastAPI & dependencies
+Pipfile
+Pipfile.lock
+poetry.lock
+
+# Logs & temp files
+*.log
+*.tmp
+*.sqlite3
+*.db
+
+# Environment variables
+.env
+.env.*
+.envrc
+secrets.json
+
+# Jupyter Notebooks (if used)
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE & Editor Configs
+.vscode/
+*.code-workspace
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# Docker & Deployment
+.dockerignore
+docker-compose.override.yml
+terraform.tfstate*
+.terraform/
+
+# System files
+.DS_Store
+Thumbs.db
+*.bak
+*.orig

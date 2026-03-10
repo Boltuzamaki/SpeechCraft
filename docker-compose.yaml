@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  # FastAPI Backend Service
+  backend:
+    build: ./backend
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  # Celery Worker Service
+  celery:
+    build: ./backend
+    command: uv run celery -A app.api.worker.celery worker --loglevel=info --concurrency=1
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - bark_model_cache:/root/.cache/suno/bark_v0
+
+  # Redis Service
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+
+  # Flask Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_CONFIG=production
+      - BACKEND_URL=http://backend:8000
+      - CALLBACK_URL=http://frontend:5000
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+    depends_on:
+      - backend
+    volumes:
+      - frontend_db:/app/instance
+
+volumes:
+  bark_model_cache:
+  frontend_db:
