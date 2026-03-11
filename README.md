@@ -14,7 +14,7 @@
 [![Whisper](https://img.shields.io/badge/OpenAI-Whisper-412991?logo=openai&logoColor=white)](https://github.com/openai/whisper)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**SpeechCraft** is a free, open-source platform that transcribes audio and video files into editable, timestamped text — then lets you embed styled subtitles back into your videos.
+**SpeechCraft** is a free, open-source platform that transcribes audio and video files into editable, timestamped text : then lets you embed styled subtitles back into your videos.
 No SaaS fees. No data leaving your infrastructure. Fully self-hosted.
 
 [Features](#-features) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [Configuration](#-configuration) · [Roadmap](#-roadmap) · [Contributing](#-contributing)
@@ -29,7 +29,7 @@ No SaaS fees. No data leaving your infrastructure. Fully self-hosted.
 |---------|-------------|
 | 🎵 **Multi-format Upload** | MP3, WAV, OGG, M4A, FLAC, AAC, WebM, MP4, AVI, MOV, MKV |
 | 🎙️ **Live Recording** | Record directly in the browser and transcribe instantly |
-| 🤖 **AI Transcription** | Powered by [OpenAI Whisper](https://github.com/openai/whisper) — runs entirely on your hardware |
+| 🤖 **AI Transcription** | Powered by [OpenAI Whisper](https://github.com/openai/whisper) : runs entirely on your hardware; model selectable from the UI (`tiny` → `large`) |
 | ⚡ **Async Processing** | Celery + Redis task queue; uploads return immediately while transcription runs in background |
 | ✏️ **Interactive Editor** | Click any segment to edit text, jump to that timestamp in the media player |
 | 🎬 **Subtitle Embedding** | Burn styled SRT subtitles into video via FFmpeg (font, size, color, outline) |
@@ -71,7 +71,7 @@ No SaaS fees. No data leaving your infrastructure. Fully self-hosted.
 |---------|------|------|------|
 | `frontend` | Flask + Gunicorn | `5000` | Web UI, auth, file management |
 | `backend` | FastAPI + Uvicorn | `8000` | STT API, task scheduling |
-| `celery` | Celery Worker | — | Runs Whisper transcription |
+| `celery` | Celery Worker | : | Runs Whisper transcription |
 | `redis` | Redis Alpine | `6379` | Message broker + task results |
 
 ---
@@ -83,14 +83,14 @@ No SaaS fees. No data leaving your infrastructure. Fully self-hosted.
 - [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/) v2+
 - Git
 
-### 1 — Clone the repository
+### 1 : Clone the repository
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/SpeechCraft.git
 cd SpeechCraft
 ```
 
-### 2 — Configure environment
+### 2 : Configure environment
 
 Copy and edit the environment file:
 
@@ -101,7 +101,7 @@ cp .env.example .env
 Minimum required variables (edit `.env`):
 
 ```env
-# Flask session secret — change this to a random string
+# Flask session secret : change this to a random string
 SESSION_SECRET=your-secret-key-here
 
 # Optional: Google OAuth (leave blank to disable Google login)
@@ -118,7 +118,7 @@ S3_BUCKET_NAME=
 DATABASE_URL=
 ```
 
-### 3 — Build and run
+### 3 : Build and run
 
 ```bash
 docker compose up --build
@@ -126,7 +126,7 @@ docker compose up --build
 
 > First run downloads the Whisper model (~140 MB for `base`). Subsequent starts are fast.
 
-### 4 — Open in your browser
+### 4 : Open in your browser
 
 | URL | Description |
 |-----|-------------|
@@ -134,7 +134,7 @@ docker compose up --build
 | http://localhost:5000/workspace | Transcription workspace |
 | http://localhost:8000/docs | FastAPI interactive API docs |
 
-### 5 — Create an account
+### 5 : Create an account
 
 Navigate to `http://localhost:5000`, click **Sign Up**, and register with your email.
 
@@ -199,12 +199,12 @@ SpeechCraft/
 | `DATABASE_URL` | SQLite | PostgreSQL connection string for production |
 | `BACKEND_URL` | `http://localhost:8000` | Internal URL of the FastAPI backend |
 | `CALLBACK_URL` | `http://frontend:5000` | URL Celery posts results back to |
-| `GOOGLE_OAUTH_CLIENT_ID` | — | Google OAuth app client ID |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | — | Google OAuth app secret |
-| `AWS_ACCESS_KEY_ID` | — | S3 credentials |
-| `AWS_SECRET_ACCESS_KEY` | — | S3 credentials |
+| `GOOGLE_OAUTH_CLIENT_ID` | : | Google OAuth app client ID |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | : | Google OAuth app secret |
+| `AWS_ACCESS_KEY_ID` | : | S3 credentials |
+| `AWS_SECRET_ACCESS_KEY` | : | S3 credentials |
 | `AWS_REGION` | `us-east-1` | S3 bucket region |
-| `S3_BUCKET_NAME` | — | S3 bucket name |
+| `S3_BUCKET_NAME` | : | S3 bucket name |
 
 #### Backend
 
@@ -215,7 +215,7 @@ SpeechCraft/
 
 ### Whisper Model Size
 
-Edit `backend/app/src/stt_main/whisperSTT/whisperstt.py` to change the model:
+The Whisper model is selected **directly from the workspace UI** before transcribing : no code changes needed.
 
 | Model | VRAM | Speed | Accuracy |
 |-------|------|-------|----------|
@@ -225,20 +225,200 @@ Edit `backend/app/src/stt_main/whisperSTT/whisperstt.py` to change the model:
 | `medium` | ~5 GB | ⚡ | ★★★★ |
 | `large` | ~10 GB | 🐢 | ★★★★★ |
 
-> CPU is supported. GPU (CUDA) is used automatically when available.
+> CPU is supported. GPU (CUDA) is used automatically when available. Models are cached after first load : switching models only re-downloads once.
 
 ---
 
-## 🔄 Workflow
+## 🔄 Internal Data Flow
+
+Three input paths all converge on the same Whisper transcription pipeline.
+
+---
+
+### 🎵 Path 1 : Audio File Upload
 
 ```
-1. Sign up / log in
-2. Upload a media file  ──or──  Record audio live in browser
-3. SpeechCraft extracts audio (FFmpeg) and sends to backend
-4. Celery worker transcribes via Whisper (async)
-5. Results are saved as timestamped segments
-6. Edit any segment in the interactive timeline editor
-7. Export transcript  ──or──  Embed styled subtitles into video
+┌─────────────────────────────────────────────────────────────────────────┐
+│  BROWSER                                                                 │
+│                                                                          │
+│  User picks file + selects Whisper model from dropdown                  │
+│  FormData { file, model_name }  ──POST /upload──►  Flask Frontend       │
+└─────────────────────────────────────────────────────────────────────────┘
+                                        │
+                              ┌─────────▼──────────────────────────────┐
+                              │  FLASK  /upload                         │
+                              │                                          │
+                              │  1. validate extension (whitelist)       │
+                              │  2. upload original file                 │
+                              │     └─► S3 bucket  (or  /local_storage) │
+                              │  3. read file bytes → base64 encode      │
+                              │  4. INSERT TranscriptionJob              │
+                              │     status = "processing"                │
+                              │  5. POST /stt  ──────────────────────►  │
+                              │     { audio_data, callback_url,          │
+                              │       model_name }                       │
+                              └──────────────────────────────────────────┘
+                                        │
+                              ┌─────────▼──────────────────────────────┐
+                              │  FASTAPI  /stt                           │
+                              │                                          │
+                              │  6. stt_task.apply_async(kwargs)         │
+                              │  7. return { task_id }  immediately      │
+                              └───────────┬────────────────────────────┘
+                                          │ enqueue
+                              ┌───────────▼────────┐
+                              │      REDIS          │
+                              │  (message broker)   │
+                              └───────────┬─────────┘
+                                          │ dequeue
+                              ┌───────────▼────────────────────────────┐
+                              │  CELERY WORKER                           │
+                              │                                          │
+                              │  8.  main_driver.main(**kwargs)          │
+                              │      └─ stt_type = "whisper" (default)   │
+                              │  9.  STTFactory → WhisperSTT(model_name) │
+                              │      └─ load_model(model_name) [cached]  │
+                              │  10. base64 decode → temp .wav file      │
+                              │  11. model.transcribe(                   │
+                              │        audio_file,                       │
+                              │        condition_on_previous_text=False, │
+                              │        no_speech_threshold=0.6           │
+                              │      )                                   │
+                              │  12. POST /callback                      │
+                              │      { task_id, status, segments[] }     │
+                              └───────────┬────────────────────────────┘
+                                          │
+                              ┌───────────▼────────────────────────────┐
+                              │  FLASK  /callback                        │
+                              │                                          │
+                              │  13. lookup job by api_task_id           │
+                              │  14. INSERT TranscriptSegment rows       │
+                              │      { segment_id, start, end, text }    │
+                              │  15. job.status = "completed"            │
+                              └───────────┬────────────────────────────┘
+                                          │
+                              ┌───────────▼────────────────────────────┐
+                              │  BROWSER  (polling /job_status every 3s) │
+                              │                                          │
+                              │  16. status == "completed"               │
+                              │      → redirect to /job/<id>             │
+                              │  17. Media Player + Transcript Editor    │
+                              └──────────────────────────────────────────┘
+```
+
+---
+
+### 🎬 Path 2 : Video File Upload
+
+Identical to Path 1 except Flask performs **server-side audio extraction** before encoding:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  BROWSER                                                                 │
+│  FormData { video_file, model_name }  ──POST /upload──►  Flask          │
+└─────────────────────────────────────────────────────────────────────────┘
+                                        │
+                              ┌─────────▼──────────────────────────────┐
+                              │  FLASK  /upload  (video branch)          │
+                              │                                          │
+                              │  1. upload original video ──► Storage   │
+                              │  2. write video to temp file             │
+                              │  3. ffmpeg -i video.mp4 \                │
+                              │          -q:a 0 -map a  audio.mp3        │
+                              │     (server-side subprocess)             │
+                              │  4. upload extracted MP3 ──► Storage    │
+                              │  5. base64 encode MP3 bytes              │
+                              │  6. INSERT TranscriptionJob              │
+                              │     original_file_url  = video URL       │
+                              │     audio_file_url     = MP3 URL         │
+                              │  7. POST /stt { audio_data, model_name } │
+                              └─────────┬──────────────────────────────┘
+                                        │
+                                   (same pipeline as Path 1 from step 6)
+                                        │
+                              ┌─────────▼──────────────────────────────┐
+                              │  Workspace : video result view           │
+                              │                                          │
+                              │  Media Player plays original video       │
+                              │  Transcript synced to video timeline     │
+                              │  "Embed SRT" burns subtitles via FFmpeg  │
+                              └──────────────────────────────────────────┘
+```
+
+---
+
+### 🎙️ Path 3 : Live Browser Recording
+
+Audio never leaves the browser until the user clicks **Transcribe Recording**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  BROWSER                                                                 │
+│                                                                          │
+│  1. getUserMedia({ audio: true })                                        │
+│     └─► MediaStream                                                      │
+│                                                                          │
+│  2. WaveformVisualizer                                                   │
+│     └─► Web Audio API AnalyserNode                                       │
+│         └─► canvas frequency bars (real-time)                            │
+│                                                                          │
+│  3. AudioRecorder (MediaRecorder API)                                    │
+│     └─► accumulates chunks [ Blob(webm) … ]                              │
+│                                                                          │
+│  4. User clicks Stop                                                      │
+│     └─► Blob assembled → object URL → <audio> preview                   │
+│                                                                          │
+│  5. User clicks "Transcribe Recording"                                   │
+│     └─► recorder.getFile()                                               │
+│         returns  File("recording_<timestamp>.webm", "audio/webm")        │
+│                                                                          │
+│  6. handleFileUpload(file)  ◄─── same function used by file upload      │
+│     └─► uploadFile(file)                                                 │
+│         FormData { file: recording.webm, model_name }                   │
+│         POST /upload                                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+                                        │
+                              ┌─────────▼──────────────────────────────┐
+                              │  FLASK  /upload  (audio branch)          │
+                              │  webm treated as audio : no extraction   │
+                              │  base64 encode → POST /stt               │
+                              └─────────┬──────────────────────────────┘
+                                        │
+                                   (same pipeline as Path 1 from step 6)
+```
+
+---
+
+### 📦 Storage Layer
+
+```
+StorageManager.upload_file()
+        │
+        ├─ AWS_ACCESS_KEY_ID set?
+        │        YES ──► boto3  → S3 bucket  (returns public URL)
+        │        NO  ──► write to  frontend/app/static/uploads/
+        │                         (returns /static/uploads/<path>)
+        │
+        └─ Both paths return { success, url, key, storage_type }
+```
+
+---
+
+### 🗄️ Database Schema (key tables)
+
+```
+TranscriptionJob
+  id, user_id, filename, file_type
+  status          ← "processing" | "completed" | "error"
+  original_file_url, audio_file_url, storage_key
+  api_task_id     ← links to Celery task / callback lookup
+  created_at
+
+TranscriptSegment
+  id, transcription_job_id
+  segment_id, start_time, end_time
+  original_text   ← raw Whisper output
+  edited_text     ← user edits (NULL until edited)
 ```
 
 ---
@@ -287,18 +467,12 @@ FLASK_CONFIG=testing uv run pytest
 - [x] Live browser audio recording
 - [x] Service health dashboard
 - [x] Docker Compose full-stack deployment
+- [x] UI-selectable Whisper model (tiny → large) per transcription
 
 ### 🔜 Coming Soon
 
-- [ ] **🌍 Real-time Subtitle Translation** — Translate transcribed subtitles into any language using an LLM or translation API (DeepL / Google Translate). Select target language per segment or for the entire transcript, then re-embed translated subtitles into video.
-- [ ] **🗣️ Speaker Diarization** — Identify and label multiple speakers in the transcript
-- [ ] **📤 Export Formats** — SRT, VTT, TXT, DOCX, JSON export options
-- [ ] **🔑 API Keys** — Public REST API with key-based auth for programmatic access
-- [ ] **👥 Team Workspaces** — Share projects and collaborate on transcripts
-- [ ] **📺 YouTube / URL Import** — Paste a video URL to transcribe directly
-- [ ] **🔔 Webhook Notifications** — Get notified on job completion
-- [ ] **🌐 Multi-language UI** — Interface localization
-
+- [ ] **🌍Subtitle Translation** : Translate transcribed subtitles into any language using an LLM 
+- [ ] **🌍QnA with Transcript** : Plan to add RAG system to do QnA with generated transcripts
 ---
 
 ## 🤝 Contributing
@@ -324,18 +498,18 @@ Found a bug or have a feature request?
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** : see the [LICENSE](LICENSE) file for details.
 Free to use, modify, and distribute.
 
 ---
 
 ## 🙏 Acknowledgements
 
-- [OpenAI Whisper](https://github.com/openai/whisper) — the STT engine that powers transcription
-- [FastAPI](https://fastapi.tiangolo.com) — modern Python web framework
-- [Flask](https://flask.palletsprojects.com) — lightweight WSGI web application framework
-- [Celery](https://docs.celeryq.dev) — distributed task queue
-- [FFmpeg](https://ffmpeg.org) — audio/video processing
+- [OpenAI Whisper](https://github.com/openai/whisper) : the STT engine that powers transcription
+- [FastAPI](https://fastapi.tiangolo.com) : modern Python web framework
+- [Flask](https://flask.palletsprojects.com) : lightweight WSGI web application framework
+- [Celery](https://docs.celeryq.dev) : distributed task queue
+- [FFmpeg](https://ffmpeg.org) : audio/video processing
 
 ---
 
