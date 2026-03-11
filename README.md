@@ -446,13 +446,6 @@ uv sync
 uv run python main.py
 ```
 
-### Running Tests
-
-```bash
-cd frontend
-FLASK_CONFIG=testing uv run pytest
-```
-
 ---
 
 ## 🗺️ Roadmap
