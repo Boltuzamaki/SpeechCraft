@@ -356,6 +356,7 @@ class TranscriptEditor {
     }
     
     showExportModal(textContent, csvContent, srtContent) {
+        const filename = this.getCurrentFilename();
         const modalHtml = `
             <div class="modal fade" id="exportModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -367,19 +368,19 @@ class TranscriptEditor {
                         <div class="modal-body">
                             <div class="row g-3">
                                 <div class="col-md-4">
-                                    <button class="btn btn-outline-light w-100" onclick="window.transcriptEditor.downloadFile('${this.getCurrentFilename()}_transcript.txt', '${btoa(textContent)}')">
+                                    <button class="btn btn-outline-light w-100" id="exportTxtBtn">
                                         <i class="fas fa-file-alt fa-2x mb-2"></i><br>
                                         Plain Text
                                     </button>
                                 </div>
                                 <div class="col-md-4">
-                                    <button class="btn btn-outline-light w-100" onclick="window.transcriptEditor.downloadFile('${this.getCurrentFilename()}_transcript.csv', '${btoa(csvContent)}')">
+                                    <button class="btn btn-outline-light w-100" id="exportCsvBtn">
                                         <i class="fas fa-table fa-2x mb-2"></i><br>
                                         CSV
                                     </button>
                                 </div>
                                 <div class="col-md-4">
-                                    <button class="btn btn-outline-light w-100" onclick="window.transcriptEditor.downloadFile('${this.getCurrentFilename()}_transcript.srt', '${btoa(srtContent)}')">
+                                    <button class="btn btn-outline-light w-100" id="exportSrtBtn">
                                         <i class="fas fa-closed-captioning fa-2x mb-2"></i><br>
                                         SRT Subtitles
                                     </button>
@@ -387,23 +388,37 @@ class TranscriptEditor {
                             </div>
                             <div class="mt-4">
                                 <h6 class="text-white">Preview (Plain Text):</h6>
-                                <textarea class="form-control" rows="8" readonly>${textContent}</textarea>
+                                <textarea class="form-control" rows="8" readonly></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         `;
-        
+
         // Remove existing modal
         const existingModal = document.getElementById('exportModal');
         if (existingModal) {
             existingModal.remove();
         }
-        
+
         // Add new modal
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
+
+        // Set preview text safely (no XSS)
+        document.querySelector('#exportModal textarea').value = textContent;
+
+        // Bind download buttons with closures (avoids btoa/encoding issues)
+        document.getElementById('exportTxtBtn').addEventListener('click', () => {
+            this.downloadContent(filename + '_transcript.txt', textContent, 'text/plain');
+        });
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            this.downloadContent(filename + '_transcript.csv', csvContent, 'text/csv');
+        });
+        document.getElementById('exportSrtBtn').addEventListener('click', () => {
+            this.downloadContent(filename + '_transcript.srt', srtContent, 'text/plain');
+        });
+
         // Show modal (assuming Bootstrap is available)
         if (typeof bootstrap !== 'undefined') {
             const modal = new bootstrap.Modal(document.getElementById('exportModal'));
@@ -411,11 +426,10 @@ class TranscriptEditor {
         }
     }
     
-    downloadFile(filename, base64Content) {
-        const content = atob(base64Content);
-        const blob = new Blob([content], { type: 'text/plain' });
+    downloadContent(filename, content, mimeType = 'text/plain') {
+        const blob = new Blob([content], { type: mimeType + ';charset=utf-8' });
         const url = URL.createObjectURL(blob);
-        
+
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
@@ -423,9 +437,19 @@ class TranscriptEditor {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         if (typeof showToast === 'function') {
             showToast(`Downloaded ${filename}`, 'success');
+        }
+    }
+
+    // Legacy method kept for any external callers
+    downloadFile(filename, base64Content) {
+        try {
+            const content = atob(base64Content);
+            this.downloadContent(filename, content);
+        } catch (e) {
+            console.error('downloadFile base64 decode failed:', e);
         }
     }
     
