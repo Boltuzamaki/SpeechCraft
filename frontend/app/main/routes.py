@@ -104,8 +104,9 @@ def upload_file():
 
         # Send transcription request
         callback_url = (current_app.config.get("CALLBACK_URL") or "").rstrip("/") + "/callback"
+        model_name = request.form.get("model_name") or request.json and request.json.get("model_name")
         api_result = send_transcription_request(
-            result["audio_data"], callback_url
+            result["audio_data"], callback_url, model_name=model_name
         )
 
         if api_result.get("success") and api_result.get("response", {}).get(

@@ -84,6 +84,98 @@
         filter: invert(1) hue-rotate(180deg);
     }
     .record-hint { font-size: 0.82rem; opacity: 0.5; margin-top: 0.75rem; }
+
+    .sidebar { max-height: calc(100vh - 100px); position: sticky; top: 80px; }
+
+    #modelSelect option { background: #1e293b; color: #fff; }
+
+    /* ── Custom Progress Bar ──────────────────────────────── */
+    .sc-progress-track {
+        width: 100%; height: 6px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 99px;
+        overflow: hidden;
+        position: relative;
+    }
+    .sc-progress-fill {
+        height: 100%;
+        border-radius: 99px;
+        background: var(--gradient-primary);
+        width: 0%;
+        transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+        position: relative;
+    }
+    .sc-progress-fill::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: shimmer 1.6s linear infinite;
+    }
+    @keyframes shimmer {
+        from { background-position: -200% 0; }
+        to   { background-position:  200% 0; }
+    }
+    .sc-progress-label {
+        font-size: 0.72rem; font-weight: 600;
+        color: rgba(255,255,255,0.5);
+        text-align: right;
+        margin-top: 4px;
+        letter-spacing: 0.04em;
+    }
+
+    /* ── Step Stepper ─────────────────────────────────────── */
+    .sc-steps {
+        display: flex; align-items: flex-start;
+        gap: 0; margin: 0 0 1.25rem; padding: 0; list-style: none;
+    }
+    .sc-step {
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; position: relative;
+    }
+    /* connector line between steps */
+    .sc-step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 16px; left: calc(50% + 16px);
+        right: calc(-50% + 16px);
+        height: 2px;
+        background: rgba(255,255,255,0.1);
+        transition: background 0.4s ease;
+    }
+    .sc-step.completed:not(:last-child)::after {
+        background: #38BDF8;
+    }
+    .sc-step-icon {
+        width: 32px; height: 32px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.78rem;
+        background: rgba(255,255,255,0.06);
+        border: 2px solid rgba(255,255,255,0.12);
+        color: rgba(255,255,255,0.3);
+        transition: all 0.35s ease;
+        position: relative; z-index: 1;
+    }
+    .sc-step.active .sc-step-icon {
+        background: rgba(56,189,248,0.15);
+        border-color: #38BDF8;
+        color: #38BDF8;
+        box-shadow: 0 0 10px rgba(56,189,248,0.35);
+    }
+    .sc-step.completed .sc-step-icon {
+        background: rgba(56,189,248,0.2);
+        border-color: #38BDF8;
+        color: #38BDF8;
+    }
+    .sc-step-label {
+        font-size: 0.68rem; margin-top: 6px;
+        color: rgba(255,255,255,0.3);
+        text-align: center; font-weight: 500;
+        transition: color 0.35s ease;
+    }
+    .sc-step.active .sc-step-label   { color: #38BDF8; }
+    .sc-step.completed .sc-step-label { color: rgba(56,189,248,0.7); }
 </style>
 {% endblock %}
 
@@ -92,39 +184,10 @@
     <div class="row">
         <!-- Sidebar -->
         <div class="col-lg-3">
-            <div class="sidebar glass-effect p-4">
-                <h5 class="text-white mb-4">
-                    <i class="fas fa-history me-2"></i>Recent Transcriptions
-                </h5>
-                
-                {% if jobs %}
-                    <div class="job-list">
-                        {% for job in jobs %}
-                            <div class="job-item mb-3 p-3 rounded {{ 'active' if current_job and current_job.id == job.id else '' }}"
-                                 onclick="window.location.href='{{ url_for('main.view_job', job_id=job.id) }}'">
-                                <h6 class="text-white mb-1" style="word-break:break-word;">{{ job.filename }}</h6>
-                                <small class="text-light d-block mb-2">{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-light">
-                                        <i class="fas fa-{{ 'video' if job.file_type == 'video' else 'music' }} me-1"></i>
-                                        {{ job.file_type.title() }} File
-                                    </small>
-                                    <span class="badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'processing' else 'danger' }} ms-2" style="white-space:nowrap;">
-                                        {{ job.status }}
-                                    </span>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-center text-light">
-                        <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
-                        <p>No transcriptions yet</p>
-                    </div>
-                {% endif %}
+            <div class="sidebar glass-effect p-4 d-flex flex-column" style="gap:0;">
 
-                <!-- Service Status Panel -->
-                <div class="mt-4 pt-3" style="border-top: 1px solid rgba(56,189,248,0.15);">
+                <!-- Service Status Panel — always at top -->
+                <div class="pb-3 mb-3" style="border-bottom: 1px solid rgba(56,189,248,0.15); flex-shrink:0;">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="text-white mb-0" style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">
                             <i class="fas fa-server me-1"></i>Services
@@ -149,6 +212,40 @@
                     </div>
                     <p class="text-light mb-0 mt-2" style="font-size:0.7rem; opacity:0.5;" id="healthLastChecked"></p>
                 </div>
+
+                <!-- Recent Transcriptions — scrollable -->
+                <div class="flex-grow-1" style="overflow-y:auto; min-height:0;">
+                    <h5 class="text-white mb-3">
+                        <i class="fas fa-history me-2"></i>Recent Transcriptions
+                    </h5>
+
+                    {% if jobs %}
+                        <div class="job-list">
+                            {% for job in jobs %}
+                                <div class="job-item mb-3 p-3 rounded {{ 'active' if current_job and current_job.id == job.id else '' }}"
+                                     onclick="window.location.href='{{ url_for('main.view_job', job_id=job.id) }}'">
+                                    <h6 class="text-white mb-1" style="word-break:break-word;">{{ job.filename }}</h6>
+                                    <small class="text-light d-block mb-2">{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-light">
+                                            <i class="fas fa-{{ 'video' if job.file_type == 'video' else 'music' }} me-1"></i>
+                                            {{ job.file_type.title() }} File
+                                        </small>
+                                        <span class="badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'processing' else 'danger' }} ms-2" style="white-space:nowrap;">
+                                            {{ job.status }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-light">
+                            <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
+                            <p>No transcriptions yet</p>
+                        </div>
+                    {% endif %}
+                </div>
+
             </div>
         </div>
 
@@ -233,6 +330,21 @@
                 <!-- Upload / Record section -->
                 <div class="upload-section" style="margin-top: 2rem;">
 
+                    <!-- Model selector -->
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <label for="modelSelect" class="text-light mb-0" style="font-size:0.85rem; white-space:nowrap;">
+                            <i class="fas fa-brain me-1 text-primary"></i>Whisper Model
+                        </label>
+                        <select id="modelSelect" class="form-select form-select-sm" style="max-width:180px; background:rgba(255,255,255,0.07); border:1px solid rgba(56,189,248,0.3); color:#fff;">
+                            <option value="tiny">Tiny: fastest</option>
+                            <option value="base" selected>Base: balanced</option>
+                            <option value="small">Small: better accuracy</option>
+                            <option value="medium">Medium: high accuracy</option>
+                            <option value="large">Large: best accuracy</option>
+                        </select>
+                        <small class="text-light opacity-50" id="modelHint">Larger models are slower but more accurate</small>
+                    </div>
+
                     <!-- Tab switcher -->
                     <div class="mode-tabs">
                         <button class="mode-tab active" id="tabUpload" onclick="switchMode('upload')">
@@ -298,23 +410,32 @@
                     <!-- Shared progress panel (used by both modes) -->
                     <div class="upload-progress mt-4" id="uploadProgress" style="display: none;">
                         <div class="glass-effect p-4">
-                            <h5 class="text-white mb-3">Processing...</h5>
-                            <ul class="upload-steps">
-                                <li class="upload-step" id="step-upload">
-                                    <i class="fas fa-upload"></i><span>Uploading file...</span>
+
+                            <!-- Step stepper -->
+                            <ul class="sc-steps">
+                                <li class="sc-step" id="step-upload">
+                                    <div class="sc-step-icon"><i class="fas fa-upload"></i></div>
+                                    <span class="sc-step-label">Upload</span>
                                 </li>
-                                <li class="upload-step" id="step-extract">
-                                    <i class="fas fa-scissors"></i><span>Extracting audio...</span>
+                                <li class="sc-step" id="step-extract">
+                                    <div class="sc-step-icon"><i class="fas fa-wave-square"></i></div>
+                                    <span class="sc-step-label">Extract Audio</span>
                                 </li>
-                                <li class="upload-step" id="step-transcribe">
-                                    <i class="fas fa-microphone"></i><span>Starting transcription...</span>
+                                <li class="sc-step" id="step-transcribe">
+                                    <div class="sc-step-icon"><i class="fas fa-microphone-alt"></i></div>
+                                    <span class="sc-step-label">Transcribe</span>
                                 </li>
                             </ul>
-                            <div class="progress mb-3 processing-progress">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated"
-                                     role="progressbar" style="width: 0%" id="overallProgress"></div>
+
+                            <!-- Custom progress bar -->
+                            <div class="sc-progress-track">
+                                <div class="sc-progress-fill" id="overallProgress"></div>
                             </div>
-                            <p class="text-light mb-0" id="uploadStatus">Preparing upload...</p>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <p class="text-light mb-0" style="font-size:0.82rem;" id="uploadStatus">Preparing upload...</p>
+                                <span class="sc-progress-label" id="progressPercent">0%</span>
+                            </div>
+
                         </div>
                     </div>
 
@@ -424,13 +545,20 @@
         if (!step) return;
         step.classList.remove('active', 'completed');
         step.classList.add(status);
-        const icon = step.querySelector('i');
-        icon.className = (status === 'active') ? 'fas fa-spinner fa-spin' : 'fas fa-check';
+        const icon = step.querySelector('.sc-step-icon i');
+        if (!icon) return;
+        if (status === 'active') {
+            icon.className = 'fas fa-spinner fa-spin';
+        } else if (status === 'completed') {
+            icon.className = 'fas fa-check';
+        }
     }
 
     function updateProgress(percent) {
-        const progressBar = document.getElementById('overallProgress');
-        if (progressBar) progressBar.style.width = percent + '%';
+        const fill = document.getElementById('overallProgress');
+        if (fill) fill.style.width = percent + '%';
+        const label = document.getElementById('progressPercent');
+        if (label) label.textContent = percent + '%';
     }
 
     async function handleFileUpload(file) {
@@ -481,6 +609,8 @@
     async function uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
+        const modelName = document.getElementById('modelSelect')?.value || 'base';
+        formData.append('model_name', modelName);
         const response = await fetch('{{ url_for("main.upload_file") }}', {
             method: 'POST',
             body: formData

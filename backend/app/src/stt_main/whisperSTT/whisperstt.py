@@ -84,6 +84,8 @@ class WhisperSTT(BaseSTT):
             result = await asyncio.to_thread(
                 self.model.transcribe,
                 audio_file,
+                condition_on_previous_text=False,
+                no_speech_threshold=0.6,
             )
             transcribed_text = result
 

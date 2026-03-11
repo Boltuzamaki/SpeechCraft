@@ -1,6 +1,5 @@
 import logging
 import os
-import shlex
 import subprocess
 import tempfile
 
@@ -96,13 +95,19 @@ def embed_subtitles_with_ffmpeg(video_url, srt_path, settings, job_id):
         outline = settings.get("outline", True)
 
         ass_color = hex_to_ass_color(font_color)
-        quoted_srt = shlex.quote(srt_path)
+
+        # FFmpeg subtitles filter requires forward slashes and escaped colons on all platforms
+        srt_for_ffmpeg = srt_path.replace("\\", "/")
+        if os.name == "nt":  # Windows: escape the drive letter colon
+            srt_for_ffmpeg = srt_for_ffmpeg.replace(":", "\\:")
+        # Wrap in single quotes for the filtergraph
+        srt_for_ffmpeg = srt_for_ffmpeg.replace("'", "\\'")
 
         style = f"FontSize={font_size},PrimaryColour={ass_color}"
         if outline:
             style += ",OutlineColour=&H80000000,Outline=2"
 
-        subtitle_filter = f"subtitles={quoted_srt}:force_style='{style}'"
+        subtitle_filter = f"subtitles='{srt_for_ffmpeg}':force_style='{style}'"
 
         cmd = [
             "ffmpeg",
@@ -110,6 +115,8 @@ def embed_subtitles_with_ffmpeg(video_url, srt_path, settings, job_id):
             input_path,
             "-vf",
             subtitle_filter,
+            "-c:v",
+            "libx264",
             "-c:a",
             "copy",
             "-y",
@@ -117,7 +124,8 @@ def embed_subtitles_with_ffmpeg(video_url, srt_path, settings, job_id):
         ]
 
         # Run FFmpeg
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        logging.info(f"Running FFmpeg command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
 
         if result.returncode == 0:
             # Upload embedded video
@@ -139,11 +147,13 @@ def embed_subtitles_with_ffmpeg(video_url, srt_path, settings, job_id):
                     "error": "Failed to upload embedded video",
                 }
         else:
-            logging.error(f"FFmpeg error: {result.stderr}")
+            logging.error(f"FFmpeg stderr: {result.stderr}")
+            # Return a short readable error (last 3 lines of stderr)
+            stderr_lines = [l for l in result.stderr.strip().splitlines() if l.strip()]
+            short_error = "\n".join(stderr_lines[-3:]) if stderr_lines else "Unknown FFmpeg error"
             return {
                 "success": False,
-                "error": "Video processing failed",
-                "details": result.stderr,
+                "error": short_error,
             }
 
     except Exception as e:

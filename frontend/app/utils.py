@@ -223,10 +223,12 @@ def process_audio_data(audio_base64, job_id):
         return {"success": False, "error": "Audio processing failed"}
 
 
-def send_transcription_request(audio_data, callback_url):
+def send_transcription_request(audio_data, callback_url, model_name=None):
     """Send transcription request to API"""
     try:
         payload = {"audio_data": audio_data, "callback_url": callback_url}
+        if model_name:
+            payload["model_name"] = model_name
 
         headers = {"Content-Type": "application/json"}
 
