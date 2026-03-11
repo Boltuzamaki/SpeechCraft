@@ -2,7 +2,11 @@ class MediaPlayer {
     constructor(containerElement, jobData) {
         this.containerElement = containerElement;
         this.job = jobData;
-        this.segments = jobData.segments || [];
+        this.segments = (jobData.segments || []).map(seg => ({
+            ...seg,
+            start_time: parseFloat(seg.start_time),
+            end_time: parseFloat(seg.end_time)
+        }));
         this.currentSegment = null;
         this.isVideo = jobData.file_type === 'video';
         this.subtitleSettings = {
@@ -14,6 +18,7 @@ class MediaPlayer {
         };
 
         this.isPlayingExpanded = false;
+        this.ccEnabled = false;
 
         this.segmentsPerScroll = 1;
         this.lastScrolledBatchIndex = -1;
@@ -66,10 +71,10 @@ class MediaPlayer {
                     </div>
                 </div>
                 
-                <div class="player-container">
+                <div class="player-container" style="position: relative; width: 100%;">
                     ${this.isVideo ? this.createVideoPlayer() : this.createAudioPlayer()}
-                    <div class="subtitle-overlay" id="subtitleOverlay" style="display: none;">
-                        <div class="subtitle-text" id="subtitleText"></div>
+                    <div class="subtitle-overlay" id="subtitleOverlay" style="display: none; position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90%; text-align: center; pointer-events: none; z-index: 100;">
+                        <div class="subtitle-text" id="subtitleText" style="display: inline-block; padding: 4px 8px; border-radius: 4px; white-space: pre-wrap;"></div>
                     </div>
                 </div>
                 
@@ -129,12 +134,11 @@ class MediaPlayer {
 
     createVideoPlayer() {
         return `
-            <video 
+            <video
                 id="mediaElement"
                 class="media-element"
-                controls="false"
                 preload="metadata"
-                poster="/static/img/video-placeholder.svg"
+                style="width: 100%; display: block;"
             >
                 <source src="${this.job.original_file_url}" type="${this.getVideoMimeType()}">
                 Your browser does not support the video tag.
@@ -146,10 +150,9 @@ class MediaPlayer {
         return `
             <div class="audio-visualizer">
                 <canvas id="audioCanvas" width="800" height="200"></canvas>
-                <audio 
+                <audio
                     id="mediaElement"
                     class="media-element"
-                    controls="false"
                     preload="metadata"
                 >
                     <source src="${this.job.original_file_url || this.job.audio_file_url}" type="${this.getAudioMimeType()}">
@@ -166,8 +169,22 @@ class MediaPlayer {
         }
 
         this.media.addEventListener('loadedmetadata', () => {
-            this.updateTotalTime();
-            this.createSegmentMarkers();
+            if (this.media.duration === Infinity) {
+                // WebM files from recorder report Infinity until seeked — force resolution
+                const resolveInfinity = () => {
+                    if (isFinite(this.media.duration)) {
+                        this.media.removeEventListener('durationchange', resolveInfinity);
+                        this.media.currentTime = 0;
+                        this.updateTotalTime();
+                        this.createSegmentMarkers();
+                    }
+                };
+                this.media.addEventListener('durationchange', resolveInfinity);
+                this.media.currentTime = 1e101; // seek far ahead to trigger duration resolution
+            } else {
+                this.updateTotalTime();
+                this.createSegmentMarkers();
+            }
         });
 
         this.media.addEventListener('timeupdate', () => {
@@ -202,7 +219,6 @@ class MediaPlayer {
         if (this.showEmbedOptionsBtn) this.showEmbedOptionsBtn.addEventListener('click', () => this.showEmbedOptions());
         if (this.toggleFullscreenBtn) this.toggleFullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
 
-
         if (this.timelineTrack) {
             this.timelineTrack.addEventListener('click', (e) => {
                 const rect = this.timelineTrack.getBoundingClientRect();
@@ -220,33 +236,27 @@ class MediaPlayer {
     }
 
     toggleTranscriptExpansionMode(enable) {
+        if (this.isVideo) return;
+
         const mainContentView = document.getElementById('mainContentView');
         const rowElement = document.querySelector('.container-fluid > .row');
 
-        if (!mainContentView || !rowElement) {
-            console.error("Critical elements not found for transcript expansion. Ensure HTML structure has: " +
-                          "1. A parent element with ID 'mainContentView' wrapping player and transcript. " +
-                          "2. A parent row with class '.container-fluid > .row' wrapping the main content column and sidebar column.");
-            return;
-        }
+        if (!mainContentView || !rowElement) return;
 
         if (enable) {
             mainContentView.classList.add('transcript-expanded-mode');
             rowElement.classList.add('transcript-expanded-mode');
             this.isPlayingExpanded = true;
-            console.log("Transcript expansion mode ENABLED. Player hidden, Transcript expanded.");
         } else {
             mainContentView.classList.remove('transcript-expanded-mode');
             rowElement.classList.remove('transcript-expanded-mode');
             this.isPlayingExpanded = false;
-            console.log("Transcript expansion mode DISABLED. Player visible, Transcript reverted.");
         }
         
         if (this.currentSegment) {
             setTimeout(() => this.highlightSegment(this.currentSegment), 50);
         }
     }
-
 
     loadSubtitles() {
         if (!this.segments.length || !this.media) return;
@@ -275,11 +285,13 @@ class MediaPlayer {
         track.srclang = 'en';
         track.src = url;
         track.default = false;
-        
+
         this.media.appendChild(track);
-        if (this.media.textTracks && this.media.textTracks.length > 0) {
-            this.media.textTracks[0].mode = 'disabled';
-        }
+        track.addEventListener('load', () => {
+            if (this.media.textTracks && this.media.textTracks.length > 0) {
+                this.media.textTracks[0].mode = 'hidden';
+            }
+        });
     }
 
     createSegmentMarkers() {
@@ -330,13 +342,19 @@ class MediaPlayer {
     }
 
     updateSubtitles() {
-        if (!this.subtitleOverlay || this.subtitleOverlay.style.display === 'none') return;
+        if (!this.subtitleOverlay || !this.subtitleText) return;
 
-        if (this.currentSegment) {
-            this.subtitleText.textContent = this.currentSegment.edited_text || this.currentSegment.original_text;
-        } else {
-            this.subtitleText.textContent = '';
+        if (this.ccEnabled && this.currentSegment) {
+            const text = this.currentSegment.edited_text || this.currentSegment.original_text;
+            if (text && text.trim()) {
+                this.subtitleText.innerHTML = text;
+                this.subtitleOverlay.style.display = 'block';
+                return;
+            }
         }
+
+        this.subtitleOverlay.style.display = 'none';
+        this.subtitleText.textContent = '';
     }
 
     highlightSegment(segment) {
@@ -350,9 +368,7 @@ class MediaPlayer {
 
             if (segmentElement && container) {
                 segmentElement.classList.add('active');
-
                 const segmentIndex = this.segments.findIndex(s => s.id === segment.id);
-
                 const currentBatchIndex = Math.floor(segmentIndex / this.segmentsPerScroll);
 
                 if (currentBatchIndex > this.lastScrolledBatchIndex) {
@@ -364,7 +380,6 @@ class MediaPlayer {
                         if (targetSegmentElement) {
                             const scrollPaddingTop = container.clientHeight * 0.15;
                             let scrollToPosition = targetSegmentElement.offsetTop - scrollPaddingTop;
-
                             const maxScrollTop = container.scrollHeight - container.clientHeight;
                             scrollToPosition = Math.max(0, Math.min(scrollToPosition, maxScrollTop));
 
@@ -372,7 +387,6 @@ class MediaPlayer {
                                 top: scrollToPosition,
                                 behavior: 'smooth'
                             });
-                            console.log(`%cSCROLL: Scrolled to bring segment index ${firstSegmentOfBatchIndex} (batch ${currentBatchIndex}) into view at ${scrollToPosition}`, 'background: #28a745; color: white');
                             this.lastScrolledBatchIndex = currentBatchIndex;
                         }
                     }
@@ -392,18 +406,26 @@ class MediaPlayer {
     }
 
     toggleSubtitles() {
-        if (!this.subtitleOverlay || !this.toggleSubtitlesBtn) return;
+        if (!this.toggleSubtitlesBtn) return;
 
-        const isVisible = this.subtitleOverlay.style.display !== 'none';
-        this.subtitleOverlay.style.display = isVisible ? 'none' : 'block';
+        this.ccEnabled = !this.ccEnabled;
 
-        if (isVisible) {
-            this.toggleSubtitlesBtn.classList.remove('btn-light');
-            this.toggleSubtitlesBtn.classList.add('btn-outline-light');
-        } else {
+        if (this.ccEnabled) {
             this.toggleSubtitlesBtn.classList.remove('btn-outline-light');
             this.toggleSubtitlesBtn.classList.add('btn-light');
+        } else {
+            this.toggleSubtitlesBtn.classList.remove('btn-light');
+            this.toggleSubtitlesBtn.classList.add('btn-outline-light');
+            if (this.subtitleOverlay) this.subtitleOverlay.style.display = 'none';
         }
+
+        if (this.ccEnabled && this.media) {
+            const currentTime = this.media.currentTime;
+            this.currentSegment = this.segments.find(
+                s => currentTime >= s.start_time && currentTime < s.end_time
+            ) || null;
+        }
+        this.updateSubtitles();
     }
 
     seekToSegment(segment) {
@@ -420,7 +442,6 @@ class MediaPlayer {
 
     previousSegment() {
         if (!this.currentSegment) return;
-        
         const currentIndex = this.segments.findIndex(s => s.id === this.currentSegment.id);
         if (currentIndex > 0) {
             this.seekToSegment(this.segments[currentIndex - 1]);
@@ -429,7 +450,6 @@ class MediaPlayer {
 
     nextSegment() {
         if (!this.currentSegment) return;
-        
         const currentIndex = this.segments.findIndex(s => s.id === this.currentSegment.id);
         if (currentIndex < this.segments.length - 1) {
             this.seekToSegment(this.segments[currentIndex + 1]);
@@ -443,8 +463,14 @@ class MediaPlayer {
     }
 
     toggleFullscreen() {
-        if (this.isVideo && this.media) {
-            if (this.media.requestFullscreen) {
+        const playerContainer = this.containerElement.querySelector('.player-container');
+        
+        if (this.isVideo && playerContainer) {
+            if (document.fullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen();
+            } else if (playerContainer.requestFullscreen) {
+                playerContainer.requestFullscreen();
+            } else if (this.media.requestFullscreen) {
                 this.media.requestFullscreen();
             }
         }
@@ -608,7 +634,13 @@ class MediaPlayer {
             
             const result = await response.json();
             if (result.success) {
-                showToast('Subtitle embedding completed!', 'success');
+                showToast('Subtitle embedding completed! Downloading...', 'success');
+                const a = document.createElement('a');
+                a.href = result.embedded_url;
+                a.download = 'embedded_' + (this.job.filename || 'video.mp4');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             } else {
                 showToast('Embedding failed: ' + result.error, 'error');
             }
@@ -620,12 +652,19 @@ class MediaPlayer {
     }
 
     updateTotalTime() {
-        if (this.media && !isNaN(this.media.duration)) {
-            this.totalTimeSpan.textContent = this.formatTime(this.media.duration);
+        if (!this.media) return;
+        const dur = this.media.duration;
+        if (isFinite(dur) && dur > 0) {
+            this.totalTimeSpan.textContent = this.formatTime(dur);
+        } else if (this.segments.length > 0) {
+            // Fallback: use last segment end_time (e.g. while WebM duration resolves)
+            const lastEnd = Math.max(...this.segments.map(s => s.end_time));
+            this.totalTimeSpan.textContent = this.formatTime(lastEnd);
         }
     }
 
     formatTime(seconds) {
+        if (!isFinite(seconds) || isNaN(seconds) || seconds < 0) return '0:00';
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -659,7 +698,8 @@ class MediaPlayer {
             'wav': 'audio/wav',
             'ogg': 'audio/ogg',
             'flac': 'audio/flac',
-            'm4a': 'audio/mp4'
+            'm4a': 'audio/mp4',
+            'webm': 'audio/webm'
         };
         return mimeTypes[extension] || 'audio/mpeg';
     }
