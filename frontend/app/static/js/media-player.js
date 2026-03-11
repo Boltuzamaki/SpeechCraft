@@ -170,7 +170,7 @@ class MediaPlayer {
 
         this.media.addEventListener('loadedmetadata', () => {
             if (this.media.duration === Infinity) {
-                // WebM files from recorder report Infinity until seeked — force resolution
+                // WebM files from recorder report Infinity until seeked : force resolution
                 const resolveInfinity = () => {
                     if (isFinite(this.media.duration)) {
                         this.media.removeEventListener('durationchange', resolveInfinity);

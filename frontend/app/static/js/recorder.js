@@ -1,5 +1,5 @@
 /**
- * AudioRecorder — Single Responsibility: MediaRecorder lifecycle only.
+ * AudioRecorder : Single Responsibility: MediaRecorder lifecycle only.
  * Produces a standard File object; has no knowledge of the DOM or UI.
  */
 class AudioRecorder {
@@ -21,7 +21,7 @@ class AudioRecorder {
 
     /**
      * Requests microphone access and starts recording.
-     * @returns {MediaStream} — callers may use this to drive a visualizer.
+     * @returns {MediaStream} : callers may use this to drive a visualizer.
      */
     async start() {
         this._chunks = [];

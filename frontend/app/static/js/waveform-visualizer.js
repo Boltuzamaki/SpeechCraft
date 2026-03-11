@@ -1,5 +1,5 @@
 /**
- * WaveformVisualizer — Single Responsibility: frequency-bar animation only.
+ * WaveformVisualizer : Single Responsibility: frequency-bar animation only.
  * Accepts a MediaStream and a <canvas> element; knows nothing about recording.
  */
 class WaveformVisualizer {
