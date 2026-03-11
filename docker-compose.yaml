@@ -47,7 +47,9 @@ services:
       - backend
     volumes:
       - frontend_db:/app/instance
+      - frontend_uploads:/app/app/static/uploads
 
 volumes:
   bark_model_cache:
   frontend_db:
+  frontend_uploads:
